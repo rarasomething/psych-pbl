@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cognitive Distortions — Snake Prototype</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <button id="mute-btn" class="mute-btn" type="button" aria-label="Mute sound">🔊</button>
+
+    <header>
+      <h1>Cognitive Distortions: Snake</h1>
+      <p class="subtitle">Based on Beck's cognitive model of depression — each pellet you eat is a distortion you internalize.</p>
+    </header>
+
+    <div class="game-area">
+      <div class="board-card">
+        <canvas id="board" width="300" height="300"></canvas>
+
+        <div id="start-overlay" class="board-overlay">
+          <div class="board-overlay-content">
+            <h2>Ready?</h2>
+            <p>Steer with the arrow keys or WASD. Tap the <span class="info-btn-demo">?</span> next to any pellet in the key for what it means.</p>
+            <button id="start-btn">Start</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="sidebar">
+        <div class="score-row">
+          <span class="score-value" id="score">0s</span>
+          <span class="score-label">survived</span>
+        </div>
+        <h2>Distortions</h2>
+        <ul id="tally-list"></ul>
+        <h2 class="section-gap">Coping skills</h2>
+        <ul id="coping-list"></ul>
+        <p class="hint"><kbd>↑↓←→</kbd> or <kbd>WASD</kbd> to move.<br />Don't run into yourself.</p>
+      </aside>
+    </div>
+
+    <div id="info-modal" class="overlay hidden">
+      <div class="overlay-card info-card">
+        <button id="info-close" class="icon-btn" type="button" aria-label="Close">✕</button>
+        <h2 id="info-title"></h2>
+        <p id="info-desc"></p>
+        <p id="info-effect" class="info-effect"></p>
+      </div>
+    </div>
+
+    <div id="game-over" class="overlay hidden">
+      <div class="overlay-card">
+        <button id="game-over-close" class="icon-btn" type="button" aria-label="Close">✕</button>
+        <h2>Game Over</h2>
+        <p>Here's what you accumulated:</p>
+        <h3>Distortions</h3>
+        <ul id="final-tally"></ul>
+        <h3>Coping skills</h3>
+        <ul id="final-coping"></ul>
+        <p class="final-score">Final score <span id="final-score">0</span></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
