@@ -1,2 +1,7 @@
 .DS_Store
 .Rhistory
+.claude/
+
+# Local working notes — kept on disk, not published to the repo/GitHub Pages
+PROGRESS.md
+WRITEUP.md
