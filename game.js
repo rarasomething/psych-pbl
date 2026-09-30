@@ -290,6 +290,7 @@ document.addEventListener("click", (e) => {
 let snake, direction, nextDirection, negativeFoods, positiveFood, positiveRespawnTimeout, ambientSpawnTimeout;
 let tally, speedMs, loopHandle, running, startTime;
 let speedMultiplier, slowdownTimeout; // "Taking a Small Step"'s temporary easing, layered on top of speedMs
+let waitingForFirstMove; // true from Start until the first accepted direction key (see beginMoving)
 
 function occupiedCells() {
   const occupied = new Set(snake.map((s) => `${s.x},${s.y}`));
@@ -359,7 +360,13 @@ function resetState() {
   speedMs = BASE_SPEED_MS;
   speedMultiplier = 1;
   running = true;
-  startTime = performance.now();
+  // The round is "on" (running=true) as soon as Start is pressed, but
+  // everything that actually progresses time — the tick loop, ambient
+  // spawning, the score clock — waits until the first direction key, via
+  // beginMoving(). Board and pellets are already visible and static in the
+  // meantime, so the player has a moment to get oriented instead of the
+  // snake immediately taking off.
+  waitingForFirstMove = true;
 
   clearTimeout(positiveRespawnTimeout);
   clearTimeout(ambientSpawnTimeout);
@@ -369,13 +376,20 @@ function resetState() {
   for (let i = 0; i < INITIAL_NEGATIVE_FOODS; i++) spawnNegativeFood();
   spawnPositiveFood();
 
-  scheduleAmbientSpawn();
-
   renderTally(tallyListEl, DISTORTIONS);
   renderTally(copingListEl, COPING);
   scoreEl.textContent = "0s";
   gameOverEl.classList.add("hidden");
   startOverlayEl.classList.add("hidden");
+}
+
+// Called once, on the first accepted direction key after Start — this is
+// what actually kicks the round into motion.
+function beginMoving() {
+  waitingForFirstMove = false;
+  startTime = performance.now(); // score counts from the first real move, not from Start
+  scheduleAmbientSpawn();
+  restartLoop();
 }
 
 function renderTally(el, types) {
@@ -639,7 +653,10 @@ function draw(timeMs) {
 
 function renderLoop(timeMs) {
   draw(timeMs);
-  if (running) {
+  // Clock stays at 0s while waiting for the first move — startTime isn't
+  // set yet at that point (it's set in beginMoving()), so computing against
+  // it here would read a stale/undefined value.
+  if (running && !waitingForFirstMove) {
     scoreEl.textContent = `${Math.floor((performance.now() - startTime) / 1000)}s`;
   }
   requestAnimationFrame(renderLoop);
@@ -727,9 +744,11 @@ function handleKey(e) {
   // Arrow keys (and space, handled above) scroll the page by default —
   // block that since they're the game's whole control scheme.
   e.preventDefault();
-  // prevent reversing directly into the snake's own neck
+  // prevent reversing directly into the snake's own neck (also blocks
+  // turning back into it as the very first move, before anything has moved)
   if (dir.x === -direction.x && dir.y === -direction.y) return;
   nextDirection = dir;
+  if (waitingForFirstMove) beginMoving();
 }
 
 document.addEventListener("keydown", handleKey);
@@ -742,7 +761,10 @@ let renderStarted = false;
 function startGame() {
   playStart(); // also the user gesture that unlocks the AudioContext on the very first press
   resetState();
-  restartLoop();
+  // No restartLoop() here on purpose — the tick loop, ambient spawning, and
+  // the score clock all start together in beginMoving(), on the first
+  // accepted direction key, so the snake sits still (and nothing else
+  // progresses) right after Start instead of immediately taking off.
   if (!renderStarted) {
     renderStarted = true;
     requestAnimationFrame(renderLoop);
