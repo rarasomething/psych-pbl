@@ -18,14 +18,33 @@
 
     <div class="game-area">
       <div class="board-card">
-        <canvas id="board" width="300" height="300"></canvas>
+        <div class="board-frame">
+          <canvas id="board" width="300" height="300"></canvas>
 
-        <div id="start-overlay" class="board-overlay">
-          <div class="board-overlay-content">
-            <h2>Ready?</h2>
-            <p>Steer with the arrow keys or WASD. Tap the <span class="info-btn-demo">?</span> next to any pellet in the key for what it means.</p>
-            <button id="start-btn">Start</button>
+          <div id="start-overlay" class="board-overlay">
+            <div class="board-overlay-content">
+              <h2>Ready?</h2>
+              <p>Steer with the arrow keys or WASD, or swipe on a touch screen. Tap the <span class="info-btn-demo">?</span> next to any pellet in the key for what it means.</p>
+              <button id="start-btn">Start</button>
+            </div>
           </div>
+
+          <div id="pause-overlay" class="board-overlay hidden">
+            <div class="board-overlay-content">
+              <h2>Paused</h2>
+              <p>Press P or Esc, or tap Resume, to keep going.</p>
+              <button id="resume-btn" class="primary-btn" type="button">Resume</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Only shown on touch screens (see .dpad in style.css). -->
+        <div id="dpad" class="dpad">
+          <button type="button" class="dpad-up" data-dir="arrowup" aria-label="Up">▲</button>
+          <button type="button" class="dpad-left" data-dir="arrowleft" aria-label="Left">◀</button>
+          <button type="button" class="dpad-pause" data-action="pause" aria-label="Pause">❚❚</button>
+          <button type="button" class="dpad-right" data-dir="arrowright" aria-label="Right">▶</button>
+          <button type="button" class="dpad-down" data-dir="arrowdown" aria-label="Down">▼</button>
         </div>
       </div>
 
@@ -33,12 +52,14 @@
         <div class="score-row">
           <span class="score-value" id="score">0s</span>
           <span class="score-label">survived</span>
+          <span class="best-score" id="best-score">Best 0s</span>
         </div>
+        <div id="slow-badge" class="slow-badge hidden"></div>
         <h2>Distortions</h2>
         <ul id="tally-list"></ul>
         <h2 class="section-gap">Coping skills</h2>
         <ul id="coping-list"></ul>
-        <p class="hint"><kbd>↑↓←→</kbd> or <kbd>WASD</kbd> to move.<br />Don't run into yourself.</p>
+        <p class="hint"><kbd>↑↓←→</kbd> or <kbd>WASD</kbd> to move, <kbd>P</kbd> to pause.<br />Don't hit the walls or yourself.</p>
       </aside>
     </div>
 
@@ -58,11 +79,12 @@
         <h2>How to play</h2>
         <p>Your snake is a mind under pressure. Survive as long as you can while negative thoughts pile up.</p>
         <ul class="help-list">
-          <li><strong>Move</strong> with the arrow keys or <kbd>WASD</kbd>. The snake waits for your first key before it starts.</li>
+          <li><strong>Move</strong> with the arrow keys or <kbd>WASD</kbd>. On a phone or tablet, swipe on the board or use the arrow pad. The snake waits for your first move before it starts.</li>
           <li><strong>Red squares are cognitive distortions.</strong> Eating one grows your trail and speeds the game up. New ones keep appearing whether you eat them or not.</li>
           <li><strong>Bright diamonds are coping skills.</strong> They're rarer, and each pushes back differently: <em>Checking the Evidence</em> shrinks your trail, <em>Reframing the Thought</em> clears distortions off the board, and <em>Taking a Small Step</em> slows the pace for a few seconds.</li>
           <li><strong>Don't hit the walls or your own trail.</strong> Your score is how many seconds you survive.</li>
           <li>Click the <span class="info-btn-demo">?</span> next to anything in the key to see what it means. The game pauses while you read.</li>
+          <li>Press <kbd>P</kbd> or <kbd>Esc</kbd> to pause.</li>
         </ul>
         <a class="help-link" href="https://docs.google.com/document/d/1l2hOG1bGz_QhXd4m-UreMS6_uuhsR1wX6SsWjypVELQ/edit?usp=sharing" target="_blank" rel="noopener">What is Major Depressive Disorder, and what are its cognitive causes? Read more →</a>
         <button id="help-ok" class="primary-btn" type="button">Got it</button>
@@ -70,15 +92,18 @@
     </div>
 
     <div id="game-over" class="overlay hidden">
-      <div class="overlay-card">
+      <div class="overlay-card game-over-card">
         <button id="game-over-close" class="icon-btn" type="button" aria-label="Close">✕</button>
         <h2>Game Over</h2>
-        <p>Here's what you accumulated:</p>
+        <p id="takeaway"></p>
         <h3>Distortions</h3>
         <ul id="final-tally"></ul>
         <h3>Coping skills</h3>
         <ul id="final-coping"></ul>
-        <p class="final-score">Final score <span id="final-score">0</span></p>
+        <p class="final-score">Final score <span id="final-score">0</span> <span id="new-best" class="new-best hidden">New best!</span></p>
+        <p class="lesson">In Beck's model, negative thoughts keep showing up whether you want them or not. Coping skills don't make them stop, but they keep them from taking over.</p>
+        <a class="help-link" href="https://docs.google.com/document/d/1l2hOG1bGz_QhXd4m-UreMS6_uuhsR1wX6SsWjypVELQ/edit?usp=sharing" target="_blank" rel="noopener">Learn more about depression and its cognitive causes →</a>
+        <button id="play-again-btn" class="primary-btn" type="button">Play again</button>
       </div>
     </div>
   </div>

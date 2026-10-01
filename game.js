@@ -15,7 +15,7 @@ const MIN_LENGTH = 3; // snake can't shrink shorter than its starting length
 // not a single shared pellet slot.
 const INITIAL_NEGATIVE_FOODS = 8; // board starts crowded — much less room to dodge
 // No hard cap anymore — distortions keep ambiently spawning until the board
-// is literally full (randomFreeCell's own bail-out handles that gracefully).
+// is literally full (randomFreeCell returns null then, and the spawn is skipped).
 // Past NEGATIVE_SLOWDOWN_THRESHOLD pellets on the board, ambient spawning
 // just slows down rather than stopping outright.
 const NEGATIVE_SLOWDOWN_THRESHOLD = 10;
@@ -24,7 +24,13 @@ const NEGATIVE_AMBIENT_SPAWN_MS = 800; // ambient spawn interval below the thres
 const NEGATIVE_AMBIENT_SPAWN_SLOW_MS = 1800; // ambient spawn interval once at/above the threshold (was 6000, then 3200)
 const POSITIVE_RESPAWN_DELAY_MS = 4500; // coping pellets wait a bit before reappearing
 const POSITIVE_RETRY_MS = 1000; // if the board's full when a coping pellet is due, try again this often
-const MAX_FREE_CELL_ATTEMPTS = 200; // bail out instead of spinning forever if the board is packed
+// New distortions never appear within this many cells (Manhattan distance)
+// of the snake's head, so the player always gets at least a move or two to
+// steer around them instead of eating one they had no chance to avoid.
+const SPAWN_SAFE_DISTANCE = 2;
+const MAX_QUEUED_TURNS = 2; // buffered key presses, so quick double turns aren't dropped
+const FLOATING_TEXT_MS = 1100; // how long a coping-effect label floats over the board
+const BEST_SCORE_KEY = "snakeBestScore";
 
 // All distortions are shades of red now (light -> dark maroon) so the
 // "negative pool" reads as one visually obvious family at a glance, distinct
@@ -140,6 +146,14 @@ const infoCloseBtn = document.getElementById("info-close");
 const muteBtn = document.getElementById("mute-btn");
 const helpModalEl = document.getElementById("help-modal");
 const helpBtn = document.getElementById("help-btn");
+const pauseOverlayEl = document.getElementById("pause-overlay");
+const resumeBtn = document.getElementById("resume-btn");
+const bestScoreEl = document.getElementById("best-score");
+const slowBadgeEl = document.getElementById("slow-badge");
+const takeawayEl = document.getElementById("takeaway");
+const newBestEl = document.getElementById("new-best");
+const playAgainBtn = document.getElementById("play-again-btn");
+const dpadEl = document.getElementById("dpad");
 
 // ---- Sound effects ----------------------------------------------------
 // Synthesized with the Web Audio API rather than audio files, so the game
@@ -244,7 +258,7 @@ function effectSummary(type) {
   if (type.kind === "distortion") return "Grows the trail by 1 and speeds the game up slightly.";
   switch (type.effect) {
     case "shrink":
-      return `Shrinks the trail by ${type.shrinkAmount ?? 1}.`;
+      return `Shrinks the trail by ${type.shrinkAmount ?? 1} and eases the speed slightly.`;
     case "clearNegatives":
       return `Clears up to ${type.clearCount} distortion pellets off the board.`;
     case "slowdown":
@@ -259,12 +273,12 @@ function showInfoModal(type) {
   infoDescEl.textContent = type.description;
   infoEffectEl.textContent = effectSummary(type);
   infoModalEl.classList.remove("hidden");
-  pauseGame(); // reading a definition shouldn't cost the player the round
+  pauseGame("info"); // reading a definition shouldn't cost the player the round
 }
 
 function hideInfoModal() {
   infoModalEl.classList.add("hidden");
-  resumeGame();
+  resumeGame("info");
 }
 
 // The how-to-play popup starts visible (no "hidden" class in the HTML) so it
@@ -272,12 +286,12 @@ function hideInfoModal() {
 // button. Like the info modal, it pauses a round that's in progress.
 function showHelpModal() {
   helpModalEl.classList.remove("hidden");
-  pauseGame();
+  pauseGame("help");
 }
 
 function hideHelpModal() {
   helpModalEl.classList.add("hidden");
-  resumeGame();
+  resumeGame("help");
 }
 
 helpBtn.addEventListener("click", () => {
@@ -285,9 +299,8 @@ helpBtn.addEventListener("click", () => {
   showHelpModal();
 });
 
-// Dismissing the game-over popup just returns to the Ready/Start screen —
-// it does NOT restart the round itself. The player has to press Start
-// again, same as the very first time.
+// Closing the game-over popup (✕, backdrop, Escape) just returns to the
+// Ready/Start screen; "Play again" (or Enter/Space) starts a new round directly.
 function dismissGameOver() {
   gameOverEl.classList.add("hidden");
   startOverlayEl.classList.remove("hidden");
@@ -318,11 +331,42 @@ document.addEventListener("click", (e) => {
   }
 });
 
-let snake, direction, nextDirection, negativeFoods, positiveFood, positiveRespawnTimeout, ambientSpawnTimeout;
+playAgainBtn.addEventListener("click", () => {
+  playAgainBtn.blur();
+  startGame();
+});
+
+resumeBtn.addEventListener("click", () => {
+  resumeBtn.blur();
+  resumeGame("manual");
+});
+
+// Leaving the tab mid-round pauses it (browsers throttle timers in hidden
+// tabs, which slowed the snake while the score clock kept counting). It uses
+// the same "manual" pause as P/Esc, so coming back shows the Paused screen
+// instead of dropping the player straight back into a moving game.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) pauseGame("manual");
+});
+
+let snake, direction, negativeFoods, positiveFood, positiveRespawnTimeout, ambientSpawnTimeout;
 let tally, speedMs, loopHandle, running, startTime;
-let speedMultiplier, slowdownTimeout; // "Taking a Small Step"'s temporary easing, layered on top of speedMs
+let directionQueue = []; // turns pressed but not yet applied, oldest first (see queueDirection)
+let speedMultiplier, slowdownEndsAt; // "Taking a Small Step"'s temporary easing, layered on top of speedMs
 let waitingForFirstMove; // true from Start until the first accepted direction key (see beginMoving)
-let pausedAt = null; // performance.now() when the info modal paused the round, else null
+let pausedAt = null; // performance.now() when the round was paused, else null
+// Why the round is paused — "help"/"info" (a popup is open) or "manual"
+// (P/Esc, the touch pause button, or leaving the tab). It only resumes once
+// every reason is cleared, so e.g. closing a popup can't unpause a round the
+// player had paused themselves.
+const pauseReasons = new Set();
+let floatingTexts = []; // short-lived labels/rings drawn over the board (see addFloatingText)
+let bestScore = 0;
+try {
+  bestScore = Number(localStorage.getItem(BEST_SCORE_KEY)) || 0;
+} catch {
+  // storage blocked — best score just won't persist between visits
+}
 
 function occupiedCells() {
   const occupied = new Set(snake.map((s) => `${s.x},${s.y}`));
@@ -331,24 +375,24 @@ function occupiedCells() {
   return occupied;
 }
 
-function randomFreeCell() {
+// Picks uniformly from the actual free cells (the board is only 100 cells, so
+// listing them is cheap) — returns null only when there genuinely is no room.
+function randomFreeCell({ awayFromHead = false } = {}) {
   const occupied = occupiedCells();
-  // Bail out instead of spinning forever if the board is nearly full — with
-  // the board now starting crowded (8 pellets) and an ambient spawner still
-  // adding more as the snake grows, an all-cells-occupied state is reachable
-  // well before the old "94-segment snake" margin assumed.
-  for (let attempt = 0; attempt < MAX_FREE_CELL_ATTEMPTS; attempt++) {
-    const pos = {
-      x: Math.floor(Math.random() * GRID_SIZE),
-      y: Math.floor(Math.random() * GRID_SIZE),
-    };
-    if (!occupied.has(`${pos.x},${pos.y}`)) return pos;
+  const head = snake[0];
+  const free = [];
+  for (let x = 0; x < GRID_SIZE; x++) {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      if (occupied.has(`${x},${y}`)) continue;
+      if (awayFromHead && Math.abs(x - head.x) + Math.abs(y - head.y) <= SPAWN_SAFE_DISTANCE) continue;
+      free.push({ x, y });
+    }
   }
-  return null;
+  return free.length ? free[Math.floor(Math.random() * free.length)] : null;
 }
 
 function spawnNegativeFood() {
-  const cell = randomFreeCell();
+  const cell = randomFreeCell({ awayFromHead: true });
   if (!cell) return; // board's full — skip this spawn rather than crash
   const type = DISTORTIONS[Math.floor(Math.random() * DISTORTIONS.length)];
   negativeFoods.push({ ...cell, type });
@@ -372,7 +416,7 @@ function spawnPositiveFood() {
 // cycle: normal pace while the board's relatively clear, slower once it's
 // crowded (NEGATIVE_SLOWDOWN_THRESHOLD+ pellets) — but never stops outright.
 // spawnNegativeFood() is itself a no-op once the board is completely full
-// (randomFreeCell's bail-out), so this just keeps trying at a calmer pace
+// (randomFreeCell returns null), so this just keeps trying at a calmer pace
 // rather than needing its own "is the board full" check.
 function scheduleAmbientSpawn() {
   clearTimeout(ambientSpawnTimeout);
@@ -393,10 +437,12 @@ function resetState() {
     { x: 3, y: 5 },
   ];
   direction = { x: 1, y: 0 };
-  nextDirection = direction;
+  directionQueue = [];
   tally = Object.fromEntries(ALL_TYPES.map((d) => [d.id, 0]));
   speedMs = BASE_SPEED_MS;
   speedMultiplier = 1;
+  slowdownEndsAt = null;
+  floatingTexts = [];
   running = true;
   // The round is "on" (running=true) as soon as Start is pressed, but
   // everything that actually progresses time — the tick loop, ambient
@@ -406,10 +452,11 @@ function resetState() {
   // snake immediately taking off.
   waitingForFirstMove = true;
   pausedAt = null;
+  pauseReasons.clear();
+  pauseOverlayEl.classList.add("hidden");
 
   clearTimeout(positiveRespawnTimeout);
   clearTimeout(ambientSpawnTimeout);
-  clearTimeout(slowdownTimeout);
   negativeFoods = [];
   positiveFood = null;
   for (let i = 0; i < INITIAL_NEGATIVE_FOODS; i++) spawnNegativeFood();
@@ -461,7 +508,14 @@ function renderTally(el, types) {
 }
 
 function tick() {
-  direction = nextDirection;
+  // "Taking a Small Step" wears off here rather than on its own timer, so a
+  // pause (which shifts slowdownEndsAt forward) can't eat into it
+  if (slowdownEndsAt !== null && performance.now() >= slowdownEndsAt) {
+    speedMultiplier = 1;
+    slowdownEndsAt = null;
+    restartLoop();
+  }
+  if (directionQueue.length) direction = directionQueue.shift();
   const head = {
     x: snake[0].x + direction.x,
     y: snake[0].y + direction.y,
@@ -493,6 +547,7 @@ function tick() {
     tally[type.id]++;
     renderTally(tallyListEl, DISTORTIONS);
     playEatDistortion();
+    addFloatingText("+1", head, "#ff8a8a");
 
     // unshift already added the head; skip the pop so the snake grows by 1
     speedMs = Math.max(MIN_SPEED_MS, speedMs - SPEED_STEP_MS);
@@ -512,7 +567,7 @@ function tick() {
     // undo the unshift's growth — this happens for every coping type,
     // regardless of its specific effect below
     snake.pop();
-    applyCopingEffect(type);
+    applyCopingEffect(type, head);
 
     clearTimeout(positiveRespawnTimeout);
     positiveRespawnTimeout = setTimeout(spawnPositiveFood, POSITIVE_RESPAWN_DELAY_MS);
@@ -522,14 +577,21 @@ function tick() {
   }
 }
 
-function applyCopingEffect(type) {
+// Each effect also floats a label over the board (and reframing rings the
+// pellets it removed) so the player can see what the coping skill just did.
+function applyCopingEffect(type, at) {
   switch (type.effect) {
     case "shrink": {
       // shrink by shrinkAmount, but never below the starting length
+      let removed = 0;
       for (let i = 0; i < (type.shrinkAmount ?? 1); i++) {
-        if (snake.length > MIN_LENGTH) snake.pop();
+        if (snake.length > MIN_LENGTH) {
+          snake.pop();
+          removed++;
+        }
       }
       speedMs = Math.min(BASE_SPEED_MS, speedMs + SPEED_STEP_MS * 2);
+      addFloatingText(removed ? `−${removed} trail` : "Trail at minimum", at, type.color);
       break;
     }
     case "clearNegatives": {
@@ -538,8 +600,10 @@ function applyCopingEffect(type) {
       const count = Math.min(type.clearCount ?? negativeFoods.length, negativeFoods.length);
       for (let i = 0; i < count; i++) {
         const idx = Math.floor(Math.random() * negativeFoods.length);
-        negativeFoods.splice(idx, 1);
+        const [cleared] = negativeFoods.splice(idx, 1);
+        addRing(cleared, type.color);
       }
+      addFloatingText(count ? `−${count} distortions` : "Nothing to clear", at, type.color);
       break;
     }
     case "slowdown": {
@@ -548,11 +612,8 @@ function applyCopingEffect(type) {
       // than overwriting it, so the easing cleanly expires back to whatever
       // speedMs has become by then
       speedMultiplier = type.slowdownFactor ?? 1.5;
-      clearTimeout(slowdownTimeout);
-      slowdownTimeout = setTimeout(() => {
-        speedMultiplier = 1;
-        restartLoop();
-      }, type.slowdownMs ?? 5000);
+      slowdownEndsAt = performance.now() + (type.slowdownMs ?? 5000);
+      addFloatingText("Slowing down", at, type.color);
       break;
     }
   }
@@ -620,14 +681,15 @@ function draw(timeMs) {
     ctx.stroke();
   }
 
-  // pulsing glow behind each food — brighter/wider for coping pellets
+  // glow behind each food — coping pellets pulse to draw the eye; distortions
+  // get a steady, dimmer glow so the board doesn't throb as it fills up
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / 220);
   const allFoods = positiveFood ? [...negativeFoods, positiveFood] : negativeFoods;
   for (const item of allFoods) {
     const isCoping = item.type.kind === "coping";
     const fx = item.x * CELL_PX + CELL_PX / 2;
     const fy = item.y * CELL_PX + CELL_PX / 2;
-    const glowR = CELL_PX * ((isCoping ? 1.3 : 0.85) + pulse * 0.35);
+    const glowR = CELL_PX * (isCoping ? 1.3 + pulse * 0.35 : 1);
     const glow = ctx.createRadialGradient(fx, fy, 0, fx, fy, glowR);
     glow.addColorStop(0, item.type.color + (isCoping ? "cc" : "88"));
     glow.addColorStop(1, item.type.color + "00");
@@ -688,6 +750,49 @@ function draw(timeMs) {
     ctx.arc(cx + offX + perpX * s, cy + offY + perpY * s, 1.6, 0, Math.PI * 2);
     ctx.fill();
   });
+
+  drawFloatingTexts(timeMs);
+}
+
+function addFloatingText(text, cell, color) {
+  floatingTexts.push({ text, cell, color, born: performance.now() });
+}
+
+function addRing(cell, color) {
+  floatingTexts.push({ ring: true, cell, color, born: performance.now() });
+}
+
+// Labels rise and fade over FLOATING_TEXT_MS; rings expand and fade where a
+// reframed distortion used to be.
+function drawFloatingTexts(timeMs) {
+  floatingTexts = floatingTexts.filter((f) => timeMs - f.born < FLOATING_TEXT_MS);
+  for (const f of floatingTexts) {
+    const t = Math.max(0, (timeMs - f.born) / FLOATING_TEXT_MS);
+    const cx = f.cell.x * CELL_PX + CELL_PX / 2;
+    const cy = f.cell.y * CELL_PX + CELL_PX / 2;
+    ctx.globalAlpha = 1 - t;
+    if (f.ring) {
+      ctx.strokeStyle = f.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, CELL_PX * (0.3 + t * 0.6), 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.font = "600 13px Inter, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const width = ctx.measureText(f.text).width;
+      // keep the label fully on the board even when eaten next to an edge
+      const x = Math.min(Math.max(cx, width / 2 + 4), canvas.width - width / 2 - 4);
+      const y = Math.max(cy - 14 - t * 24, 10);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#14141f";
+      ctx.strokeText(f.text, x, y);
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, x, y);
+    }
+  }
+  ctx.globalAlpha = 1;
 }
 
 function renderLoop(timeMs) {
@@ -699,6 +804,11 @@ function renderLoop(timeMs) {
     const now = pausedAt ?? performance.now(); // clock freezes while paused
     scoreEl.textContent = `${Math.floor((now - startTime) / 1000)}s`;
   }
+  const slowLeft = running && slowdownEndsAt !== null
+    ? Math.ceil((slowdownEndsAt - (pausedAt ?? performance.now())) / 1000)
+    : 0;
+  slowBadgeEl.classList.toggle("hidden", slowLeft <= 0);
+  if (slowLeft > 0) slowBadgeEl.textContent = `Slowed · ${slowLeft}s`;
   requestAnimationFrame(renderLoop);
 }
 
@@ -707,33 +817,71 @@ function gameOver() {
   clearInterval(loopHandle);
   clearTimeout(positiveRespawnTimeout);
   clearTimeout(ambientSpawnTimeout);
-  // Was missing: if a "Taking a Small Step" slowdown was still active when
-  // the player died, its pending timeout would fire 5s later regardless,
-  // reset speedMultiplier, and call restartLoop() — silently reviving the
-  // tick loop (and re-triggering gameOver(), replaying its sound and
-  // quietly changing the displayed score) well after death.
-  clearTimeout(slowdownTimeout);
+  slowdownEndsAt = null;
   playGameOver();
   renderTally(finalTallyEl, DISTORTIONS);
   renderTally(finalCopingEl, COPING);
   const secondsSurvived = Math.floor((performance.now() - startTime) / 1000);
   finalScoreEl.textContent = `${secondsSurvived}s`;
+  takeawayEl.textContent = takeawayText();
+
+  const isNewBest = secondsSurvived > bestScore;
+  newBestEl.classList.toggle("hidden", !isNewBest);
+  if (isNewBest) {
+    bestScore = secondsSurvived;
+    try {
+      localStorage.setItem(BEST_SCORE_KEY, String(bestScore));
+    } catch {
+      // best-effort persistence only
+    }
+    renderBestScore();
+  }
   gameOverEl.classList.remove("hidden");
+}
+
+// One-line recap of the round for the game-over popup, connecting the counts
+// back to the idea the game is built on.
+function takeawayText() {
+  const sum = (types) => types.reduce((n, t) => n + tally[t.id], 0);
+  const distortions = sum(DISTORTIONS);
+  const coping = sum(COPING);
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  if (coping === 0) {
+    return `${plural(distortions, "distortion")} piled up, and no coping skills were used to push back.`;
+  }
+  return `${plural(distortions, "distortion")} piled up, and you used ${plural(coping, "coping skill")} to push back.`;
+}
+
+function renderBestScore() {
+  bestScoreEl.textContent = `Best ${bestScore}s`;
 }
 
 // Pause only matters once the snake is actually moving — before the first
 // move nothing is ticking anyway, and after game over there's nothing to pause.
-function pauseGame() {
-  if (!running || waitingForFirstMove || pausedAt !== null) return;
+function pauseGame(reason) {
+  if (!running || waitingForFirstMove) return;
+  pauseReasons.add(reason);
+  pauseOverlayEl.classList.toggle("hidden", !pauseReasons.has("manual"));
+  if (pausedAt !== null) return;
   pausedAt = performance.now();
   clearInterval(loopHandle);
 }
 
-function resumeGame() {
-  if (pausedAt === null) return;
-  startTime += performance.now() - pausedAt; // paused time doesn't count toward the score
+function resumeGame(reason) {
+  pauseReasons.delete(reason);
+  pauseOverlayEl.classList.toggle("hidden", !pauseReasons.has("manual"));
+  if (pausedAt === null || pauseReasons.size) return;
+  // paused time counts toward neither the score nor an active slowdown
+  const pausedFor = performance.now() - pausedAt;
+  startTime += pausedFor;
+  if (slowdownEndsAt !== null) slowdownEndsAt += pausedFor;
   pausedAt = null;
   restartLoop();
+}
+
+function togglePause() {
+  if (pauseReasons.has("manual")) resumeGame("manual");
+  else pauseGame("manual");
 }
 
 function restartLoop() {
@@ -765,7 +913,7 @@ function handleKey(e) {
   // keys silently scrolled the page again whenever the info modal, the
   // game-over popup, or the ready screen was showing.
   const isOwnKey = Object.prototype.hasOwnProperty.call(DIRECTION_KEYS, key) ||
-    key === "enter" || key === " " || key === "escape";
+    key === "enter" || key === " " || key === "escape" || key === "p";
 
   // Whichever overlay is on top gets the keyboard first, so precedence here
   // has to match the visual stacking order (help/info modal > game-over
@@ -786,9 +934,9 @@ function handleKey(e) {
 
   if (!gameOverEl.classList.contains("hidden")) {
     if (isOwnKey) e.preventDefault();
-    // dismiss only — same as the X/backdrop click. Does NOT restart; the
-    // player has to press Start again on the screen this reveals.
-    if (key === "enter" || key === " " || key === "escape") dismissGameOver();
+    // Enter/Space = "Play again"; Escape = close back to the Ready screen
+    if (key === "enter" || key === " ") startGame();
+    else if (key === "escape") dismissGameOver();
     return;
   }
 
@@ -803,16 +951,63 @@ function handleKey(e) {
   // Arrow keys and Space scroll the page by default, and Space/Enter would
   // press whichever button still has focus — block both during play.
   if (isOwnKey) e.preventDefault();
+
+  if (pauseReasons.has("manual")) {
+    if (key === "p" || key === "escape" || key === "enter" || key === " ") resumeGame("manual");
+    return; // direction keys don't steer a paused snake
+  }
+  if (key === "p" || key === "escape") {
+    pauseGame("manual");
+    return;
+  }
+
   const dir = DIRECTION_KEYS[key];
-  if (!dir) return;
+  if (dir) steer(dir);
+}
+
+// Shared by the keyboard, the on-screen arrow pad, and swipes.
+function steer(dir) {
+  if (!running || pausedAt !== null) return;
+  // Compare against the last *queued* turn, not the current direction, so a
+  // fast up-then-left both land instead of the second overwriting the first.
+  const last = directionQueue.length ? directionQueue[directionQueue.length - 1] : direction;
   // prevent reversing directly into the snake's own neck (also blocks
   // turning back into it as the very first move, before anything has moved)
-  if (dir.x === -direction.x && dir.y === -direction.y) return;
-  nextDirection = dir;
+  if (dir.x === -last.x && dir.y === -last.y) return;
+  const isSame = dir.x === last.x && dir.y === last.y;
+  if (!isSame && directionQueue.length < MAX_QUEUED_TURNS) directionQueue.push(dir);
   if (waitingForFirstMove) beginMoving();
 }
 
 document.addEventListener("keydown", handleKey);
+
+// ---- Touch controls ---------------------------------------------------
+// Arrow pad (only shown on touch screens, see style.css) plus swipes on the
+// board itself. pointerdown rather than click so a tap registers instantly.
+dpadEl.addEventListener("pointerdown", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  e.preventDefault();
+  if (btn.dataset.dir) steer(DIRECTION_KEYS[btn.dataset.dir]);
+  else if (btn.dataset.action === "pause") togglePause();
+});
+
+const SWIPE_MIN_PX = 20;
+let swipeStart = null;
+canvas.addEventListener("touchstart", (e) => {
+  const t = e.changedTouches[0];
+  swipeStart = { x: t.clientX, y: t.clientY };
+}, { passive: true });
+canvas.addEventListener("touchend", (e) => {
+  if (!swipeStart) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - swipeStart.x;
+  const dy = t.clientY - swipeStart.y;
+  swipeStart = null;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_MIN_PX) return;
+  if (Math.abs(dx) > Math.abs(dy)) steer({ x: Math.sign(dx), y: 0 });
+  else steer({ x: 0, y: Math.sign(dy) });
+});
 startBtn.addEventListener("click", startGame);
 // gameOverCloseBtn's click is handled by the delegated document click
 // listener above (dismissGameOver), same as the info modal's close button.
@@ -838,3 +1033,4 @@ function startGame() {
 tally = Object.fromEntries(ALL_TYPES.map((d) => [d.id, 0]));
 renderTally(tallyListEl, DISTORTIONS);
 renderTally(copingListEl, COPING);
+renderBestScore();
