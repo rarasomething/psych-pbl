@@ -43,7 +43,7 @@ const DISTORTIONS = [
     label: "Jumping to Conclusions",
     color: "#ff6b6b",
     effect: "grow",
-    description: "You assumed the worst with barely any evidence to back it up.",
+    description: "Deciding something bad is true without enough evidence.",
   },
   {
     id: "allOrNothing",
@@ -51,7 +51,7 @@ const DISTORTIONS = [
     label: "All-or-Nothing Thinking",
     color: "#e64545",
     effect: "grow",
-    description: "It's either perfect or a total failure — no middle ground allowed.",
+    description: "Seeing things as either perfect or a total failure.",
   },
   {
     id: "blowingUp",
@@ -59,7 +59,7 @@ const DISTORTIONS = [
     label: "Blowing Things Out of Proportion",
     color: "#cc3333",
     effect: "grow",
-    description: "A small setback suddenly feels like an absolute catastrophe.",
+    description: "Treating a small problem like a huge disaster.",
   },
   {
     id: "overgeneralizing",
@@ -67,7 +67,7 @@ const DISTORTIONS = [
     label: "Overgeneralizing",
     color: "#b3232f",
     effect: "grow",
-    description: "One bad moment gets rewritten as 'this always happens to me.'",
+    description: "Taking one bad event and deciding it will always happen.",
   },
   {
     id: "personalizing",
@@ -75,7 +75,7 @@ const DISTORTIONS = [
     label: "Taking It Personally",
     color: "#99182b",
     effect: "grow",
-    description: "You're sure it was about you, even without any real proof.",
+    description: "Believing something bad happened because of you.",
   },
   {
     id: "tunnelVision",
@@ -83,7 +83,7 @@ const DISTORTIONS = [
     label: "Tunnel Vision",
     color: "#7a1220",
     effect: "grow",
-    description: "You fixate on the one negative detail and tune out everything else.",
+    description: "Focusing on one negative detail and ignoring everything else.",
   },
 ];
 
@@ -101,7 +101,7 @@ const COPING = [
     color: "#5eead4",
     effect: "shrink",
     shrinkAmount: 3,
-    description: "You paused to test the thought against the facts instead of assuming.",
+    description: "Looking at the facts to see if a thought is really true.",
   },
   {
     id: "reframing",
@@ -110,7 +110,7 @@ const COPING = [
     color: "#a3e635",
     effect: "clearNegatives",
     clearCount: 3,
-    description: "You found a more balanced way to see it — a few distortions lose their grip.",
+    description: "Finding a more balanced way to look at a situation.",
   },
   {
     id: "smallStep",
@@ -120,7 +120,7 @@ const COPING = [
     effect: "slowdown",
     slowdownMs: 5000,
     slowdownFactor: 1.6,
-    description: "You acted in a small way instead of freezing up — the pace eases for a bit.",
+    description: "Doing one small, doable thing when you feel stuck.",
   },
 ];
 
