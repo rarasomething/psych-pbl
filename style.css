@@ -236,12 +236,20 @@ canvas {
   font-size: 0.75rem;
 }
 
+/* Absolutely positioned on .board-card's top border — taking it out of the
+   flow means showing/hiding it can't change any element's size (it used to
+   sit in the sidebar and push the page around every time it appeared). */
 .slow-badge {
-  display: inline-block;
-  margin: -8px 0 14px;
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  white-space: nowrap;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(56, 189, 248, 0.15); /* "Taking a Small Step" blue */
+  background: #10283a; /* opaque, since it straddles the card's border */
+  border: 1px solid rgba(56, 189, 248, 0.45); /* "Taking a Small Step" blue */
   color: #38bdf8;
   font-size: 0.75rem;
   font-weight: 600;

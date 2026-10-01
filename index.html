@@ -18,6 +18,9 @@
 
     <div class="game-area">
       <div class="board-card">
+        <!-- Sits on the card's top edge, outside the board, so showing it
+             never shifts the layout or covers the play area. -->
+        <div id="slow-badge" class="slow-badge hidden"></div>
         <div class="board-frame">
           <canvas id="board" width="300" height="300"></canvas>
 
@@ -54,7 +57,6 @@
           <span class="score-label">survived</span>
           <span class="best-score" id="best-score">Best 0s</span>
         </div>
-        <div id="slow-badge" class="slow-badge hidden"></div>
         <h2>Distortions</h2>
         <ul id="tally-list"></ul>
         <h2 class="section-gap">Coping skills</h2>
