@@ -23,6 +23,7 @@ const NEGATIVE_DOUBLE_SPAWN_CHANCE = 0.3; // chance a second distortion appears 
 const NEGATIVE_AMBIENT_SPAWN_MS = 800; // ambient spawn interval below the threshold (was 2600, then 1400)
 const NEGATIVE_AMBIENT_SPAWN_SLOW_MS = 1800; // ambient spawn interval once at/above the threshold (was 6000, then 3200)
 const POSITIVE_RESPAWN_DELAY_MS = 4500; // coping pellets wait a bit before reappearing
+const POSITIVE_RETRY_MS = 1000; // if the board's full when a coping pellet is due, try again this often
 const MAX_FREE_CELL_ATTEMPTS = 200; // bail out instead of spinning forever if the board is packed
 
 // All distortions are shades of red now (light -> dark maroon) so the
@@ -137,6 +138,8 @@ const infoDescEl = document.getElementById("info-desc");
 const infoEffectEl = document.getElementById("info-effect");
 const infoCloseBtn = document.getElementById("info-close");
 const muteBtn = document.getElementById("mute-btn");
+const helpModalEl = document.getElementById("help-modal");
+const helpBtn = document.getElementById("help-btn");
 
 // ---- Sound effects ----------------------------------------------------
 // Synthesized with the Web Audio API rather than audio files, so the game
@@ -223,6 +226,8 @@ muteBtn.addEventListener("click", () => {
     // best-effort persistence only
   }
   updateMuteBtn();
+  // drop focus so Space/Enter during play don't re-press this button
+  muteBtn.blur();
   if (!muted) ensureAudioContext(); // unlock audio on the same gesture that unmutes
 });
 
@@ -254,11 +259,31 @@ function showInfoModal(type) {
   infoDescEl.textContent = type.description;
   infoEffectEl.textContent = effectSummary(type);
   infoModalEl.classList.remove("hidden");
+  pauseGame(); // reading a definition shouldn't cost the player the round
 }
 
 function hideInfoModal() {
   infoModalEl.classList.add("hidden");
+  resumeGame();
 }
+
+// The how-to-play popup starts visible (no "hidden" class in the HTML) so it
+// greets the player on page load; after that it only reopens via the "?"
+// button. Like the info modal, it pauses a round that's in progress.
+function showHelpModal() {
+  helpModalEl.classList.remove("hidden");
+  pauseGame();
+}
+
+function hideHelpModal() {
+  helpModalEl.classList.add("hidden");
+  resumeGame();
+}
+
+helpBtn.addEventListener("click", () => {
+  helpBtn.blur(); // same reason as the mute button: keep Space/Enter for the game
+  showHelpModal();
+});
 
 // Dismissing the game-over popup just returns to the Ready/Start screen —
 // it does NOT restart the round itself. The player has to press Start
@@ -274,8 +299,14 @@ function dismissGameOver() {
 document.addEventListener("click", (e) => {
   const infoBtn = e.target.closest(".info-btn");
   if (infoBtn) {
+    // drop focus so a later Enter/Space during play doesn't reopen the modal
+    infoBtn.blur();
     const type = findType(infoBtn.dataset.id);
     if (type) showInfoModal(type);
+    return;
+  }
+  if (e.target === helpModalEl || e.target.closest("#help-close, #help-ok")) {
+    hideHelpModal();
     return;
   }
   if (e.target === infoModalEl || e.target === infoCloseBtn) {
@@ -291,6 +322,7 @@ let snake, direction, nextDirection, negativeFoods, positiveFood, positiveRespaw
 let tally, speedMs, loopHandle, running, startTime;
 let speedMultiplier, slowdownTimeout; // "Taking a Small Step"'s temporary easing, layered on top of speedMs
 let waitingForFirstMove; // true from Start until the first accepted direction key (see beginMoving)
+let pausedAt = null; // performance.now() when the info modal paused the round, else null
 
 function occupiedCells() {
   const occupied = new Set(snake.map((s) => `${s.x},${s.y}`));
@@ -324,8 +356,14 @@ function spawnNegativeFood() {
 
 function spawnPositiveFood() {
   if (!running) return;
-  const cell = randomFreeCell();
-  if (!cell) return;
+  const cell = pausedAt === null ? randomFreeCell() : null;
+  if (!cell) {
+    // board's full (or the round is paused) — keep retrying instead of
+    // leaving the round without coping pellets for good
+    clearTimeout(positiveRespawnTimeout);
+    positiveRespawnTimeout = setTimeout(spawnPositiveFood, POSITIVE_RETRY_MS);
+    return;
+  }
   const type = COPING[Math.floor(Math.random() * COPING.length)];
   positiveFood = { ...cell, type };
 }
@@ -343,7 +381,7 @@ function scheduleAmbientSpawn() {
     : NEGATIVE_AMBIENT_SPAWN_MS;
   ambientSpawnTimeout = setTimeout(() => {
     if (!running) return;
-    spawnNegativeFood();
+    if (pausedAt === null) spawnNegativeFood();
     scheduleAmbientSpawn();
   }, delay);
 }
@@ -367,6 +405,7 @@ function resetState() {
   // meantime, so the player has a moment to get oriented instead of the
   // snake immediately taking off.
   waitingForFirstMove = true;
+  pausedAt = null;
 
   clearTimeout(positiveRespawnTimeout);
   clearTimeout(ambientSpawnTimeout);
@@ -657,7 +696,8 @@ function renderLoop(timeMs) {
   // set yet at that point (it's set in beginMoving()), so computing against
   // it here would read a stale/undefined value.
   if (running && !waitingForFirstMove) {
-    scoreEl.textContent = `${Math.floor((performance.now() - startTime) / 1000)}s`;
+    const now = pausedAt ?? performance.now(); // clock freezes while paused
+    scoreEl.textContent = `${Math.floor((now - startTime) / 1000)}s`;
   }
   requestAnimationFrame(renderLoop);
 }
@@ -681,10 +721,25 @@ function gameOver() {
   gameOverEl.classList.remove("hidden");
 }
 
+// Pause only matters once the snake is actually moving — before the first
+// move nothing is ticking anyway, and after game over there's nothing to pause.
+function pauseGame() {
+  if (!running || waitingForFirstMove || pausedAt !== null) return;
+  pausedAt = performance.now();
+  clearInterval(loopHandle);
+}
+
+function resumeGame() {
+  if (pausedAt === null) return;
+  startTime += performance.now() - pausedAt; // paused time doesn't count toward the score
+  pausedAt = null;
+  restartLoop();
+}
+
 function restartLoop() {
   // Defense in depth for the bug above: whatever calls this, never actually
-  // start ticking again once the round is over.
-  if (!running) return;
+  // start ticking again once the round is over (or while it's paused).
+  if (!running || pausedAt !== null) return;
   clearInterval(loopHandle);
   loopHandle = setInterval(tick, speedMs * speedMultiplier);
 }
@@ -713,8 +768,14 @@ function handleKey(e) {
     key === "enter" || key === " " || key === "escape";
 
   // Whichever overlay is on top gets the keyboard first, so precedence here
-  // has to match the visual stacking order (info modal > game-over popup >
-  // ready/start screen > live play):
+  // has to match the visual stacking order (help/info modal > game-over
+  // popup > ready/start screen > live play):
+  if (!helpModalEl.classList.contains("hidden")) {
+    if (isOwnKey) e.preventDefault();
+    if (key === "escape" || key === "enter" || key === " ") hideHelpModal();
+    return;
+  }
+
   if (!infoModalEl.classList.contains("hidden")) {
     if (isOwnKey) e.preventDefault();
     // swallow everything else so arrow keys don't move the snake underneath
@@ -739,11 +800,11 @@ function handleKey(e) {
     return;
   }
 
+  // Arrow keys and Space scroll the page by default, and Space/Enter would
+  // press whichever button still has focus — block both during play.
+  if (isOwnKey) e.preventDefault();
   const dir = DIRECTION_KEYS[key];
   if (!dir) return;
-  // Arrow keys (and space, handled above) scroll the page by default —
-  // block that since they're the game's whole control scheme.
-  e.preventDefault();
   // prevent reversing directly into the snake's own neck (also blocks
   // turning back into it as the very first move, before anything has moved)
   if (dir.x === -direction.x && dir.y === -direction.y) return;

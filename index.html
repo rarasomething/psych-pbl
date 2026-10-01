@@ -8,7 +8,8 @@
 </head>
 <body>
   <div class="wrap">
-    <button id="mute-btn" class="mute-btn" type="button" aria-label="Mute sound">🔊</button>
+    <button id="help-btn" class="corner-btn help-btn" type="button" aria-label="How to play">?</button>
+    <button id="mute-btn" class="corner-btn mute-btn" type="button" aria-label="Mute sound">🔊</button>
 
     <header>
       <h1>Cognitive Distortions: Snake</h1>
@@ -47,6 +48,24 @@
         <h2 id="info-title"></h2>
         <p id="info-desc"></p>
         <p id="info-effect" class="info-effect"></p>
+      </div>
+    </div>
+
+    <!-- Shown automatically on page load; reopened any time with the "?" button top-left. -->
+    <div id="help-modal" class="overlay">
+      <div class="overlay-card help-card">
+        <button id="help-close" class="icon-btn" type="button" aria-label="Close">✕</button>
+        <h2>How to play</h2>
+        <p>Your snake is a mind under pressure. Survive as long as you can while negative thoughts pile up.</p>
+        <ul class="help-list">
+          <li><strong>Move</strong> with the arrow keys or <kbd>WASD</kbd>. The snake waits for your first key before it starts.</li>
+          <li><strong>Red squares are cognitive distortions.</strong> Eating one grows your trail and speeds the game up. New ones keep appearing whether you eat them or not.</li>
+          <li><strong>Bright diamonds are coping skills.</strong> They're rarer, and each pushes back differently: <em>Checking the Evidence</em> shrinks your trail, <em>Reframing the Thought</em> clears distortions off the board, and <em>Taking a Small Step</em> slows the pace for a few seconds.</li>
+          <li><strong>Don't hit the walls or your own trail.</strong> Your score is how many seconds you survive.</li>
+          <li>Click the <span class="info-btn-demo">?</span> next to anything in the key to see what it means. The game pauses while you read.</li>
+        </ul>
+        <a class="help-link" href="https://docs.google.com/document/d/1l2hOG1bGz_QhXd4m-UreMS6_uuhsR1wX6SsWjypVELQ/edit?usp=sharing" target="_blank" rel="noopener">What is Major Depressive Disorder, and what are its cognitive causes? Read more →</a>
+        <button id="help-ok" class="primary-btn" type="button">Got it</button>
       </div>
     </div>
 
