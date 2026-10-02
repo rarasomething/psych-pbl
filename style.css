@@ -72,7 +72,7 @@ body {
 }
 
 header {
-  margin-bottom: 24px;
+  margin-bottom: 18px;
   /* Room on both sides for the .corner-btn buttons (34px + gap), so a
      wrapped title on a narrow screen can't run under them. */
   padding: 0 44px;
@@ -86,12 +86,35 @@ header h1 {
   letter-spacing: -0.02em;
 }
 
-.subtitle {
-  margin: 0 auto;
-  max-width: 480px;
+/* Spans exactly the board card + gap + sidebar (330 + 20 + 280) on desktop;
+   on narrow screens it matches the stacked boxes (see the media query below). */
+.intro {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  max-width: 630px;
+  margin: 0 auto 20px;
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.intro h2 {
+  margin: 0 0 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--muted);
-  font-size: 0.88rem;
+}
+
+.intro p {
+  margin: 0;
+  font-size: 0.8rem;
   line-height: 1.5;
+  color: var(--text);
+  opacity: 0.85;
 }
 
 .game-area {
@@ -109,7 +132,10 @@ header h1 {
   border-radius: var(--radius-lg);
   padding: 14px;
   box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.6);
-  flex: 0 0 auto;
+  /* Allowed to shrink (the canvas scales down with it) so the board fits on
+     the narrowest phones (320px) without the page scrolling sideways. */
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 /* Overlay that sits directly on the board and blocks play until Start is
@@ -612,9 +638,17 @@ kbd {
   transform: translateY(0);
 }
 
-@media (max-width: 520px) {
+/* Once the sidebar wraps under the board, give the intro, board and sidebar
+   one shared width so they still line up. */
+@media (max-width: 601px) {
+  .intro {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    max-width: 330px;
+  }
+
   .sidebar {
-    max-width: 100%;
-    width: 100%;
+    flex-basis: 100%;
+    max-width: 330px;
   }
 }

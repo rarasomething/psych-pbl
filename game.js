@@ -109,7 +109,7 @@ const COPING = [
     label: "Reframing the Thought",
     color: "#a3e635",
     effect: "clearNegatives",
-    clearCount: 3,
+    clearFraction: 0.2, // share of the distortions on the board, rounded up
     description: "Finding a more balanced way to look at a situation.",
   },
   {
@@ -260,7 +260,7 @@ function effectSummary(type) {
     case "shrink":
       return `Shrinks the trail by ${type.shrinkAmount ?? 1} and eases the speed slightly.`;
     case "clearNegatives":
-      return `Clears up to ${type.clearCount} distortion pellets off the board.`;
+      return `Clears ${Math.round(type.clearFraction * 100)}% of the distortion pellets on the board.`;
     case "slowdown":
       return `Slows the game down for ${Math.round((type.slowdownMs ?? 0) / 1000)} seconds.`;
     default:
@@ -350,6 +350,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 let snake, direction, negativeFoods, positiveFood, positiveRespawnTimeout, ambientSpawnTimeout;
+let positiveDueAt = null; // performance.now() when the next coping pellet is due, else null
 let tally, speedMs, loopHandle, running, startTime;
 let directionQueue = []; // turns pressed but not yet applied, oldest first (see queueDirection)
 let speedMultiplier, slowdownEndsAt; // "Taking a Small Step"'s temporary easing, layered on top of speedMs
@@ -398,16 +399,24 @@ function spawnNegativeFood() {
   negativeFoods.push({ ...cell, type });
 }
 
+// The due time is tracked (not just the timeout) so pausing can stop the
+// countdown and resuming can pick it back up with whatever time was left.
+function schedulePositiveSpawn(delay) {
+  clearTimeout(positiveRespawnTimeout);
+  positiveDueAt = performance.now() + delay;
+  positiveRespawnTimeout = setTimeout(spawnPositiveFood, delay);
+}
+
 function spawnPositiveFood() {
   if (!running) return;
   const cell = pausedAt === null ? randomFreeCell() : null;
   if (!cell) {
     // board's full (or the round is paused) — keep retrying instead of
     // leaving the round without coping pellets for good
-    clearTimeout(positiveRespawnTimeout);
-    positiveRespawnTimeout = setTimeout(spawnPositiveFood, POSITIVE_RETRY_MS);
+    schedulePositiveSpawn(POSITIVE_RETRY_MS);
     return;
   }
+  positiveDueAt = null;
   const type = COPING[Math.floor(Math.random() * COPING.length)];
   positiveFood = { ...cell, type };
 }
@@ -457,6 +466,7 @@ function resetState() {
 
   clearTimeout(positiveRespawnTimeout);
   clearTimeout(ambientSpawnTimeout);
+  positiveDueAt = null;
   negativeFoods = [];
   positiveFood = null;
   for (let i = 0; i < INITIAL_NEGATIVE_FOODS; i++) spawnNegativeFood();
@@ -569,8 +579,7 @@ function tick() {
     snake.pop();
     applyCopingEffect(type, head);
 
-    clearTimeout(positiveRespawnTimeout);
-    positiveRespawnTimeout = setTimeout(spawnPositiveFood, POSITIVE_RESPAWN_DELAY_MS);
+    schedulePositiveSpawn(POSITIVE_RESPAWN_DELAY_MS);
     restartLoop();
   } else {
     snake.pop();
@@ -595,15 +604,16 @@ function applyCopingEffect(type, at) {
       break;
     }
     case "clearNegatives": {
-      // reframing undercuts the distortions themselves — remove a handful
-      // of whichever ones happen to be on the board right now
-      const count = Math.min(type.clearCount ?? negativeFoods.length, negativeFoods.length);
+      // reframing undercuts the distortions themselves — remove a share of
+      // whichever ones are on the board right now (rounded up, so at least
+      // one goes whenever any are there)
+      const count = Math.min(Math.ceil(negativeFoods.length * (type.clearFraction ?? 1)), negativeFoods.length);
       for (let i = 0; i < count; i++) {
         const idx = Math.floor(Math.random() * negativeFoods.length);
         const [cleared] = negativeFoods.splice(idx, 1);
         addRing(cleared, type.color);
       }
-      addFloatingText(count ? `−${count} distortions` : "Nothing to clear", at, type.color);
+      addFloatingText(count ? `−${count} distortion${count === 1 ? "" : "s"}` : "Nothing to clear", at, type.color);
       break;
     }
     case "slowdown": {
@@ -823,6 +833,7 @@ function gameOver() {
   renderTally(finalCopingEl, COPING);
   const secondsSurvived = Math.floor((performance.now() - startTime) / 1000);
   finalScoreEl.textContent = `${secondsSurvived}s`;
+  scoreEl.textContent = `${secondsSurvived}s`; // the render loop stops updating it once running is false
   takeawayEl.textContent = takeawayText();
 
   const isNewBest = secondsSurvived > bestScore;
@@ -865,6 +876,7 @@ function pauseGame(reason) {
   if (pausedAt !== null) return;
   pausedAt = performance.now();
   clearInterval(loopHandle);
+  clearTimeout(positiveRespawnTimeout); // picked back up in resumeGame
 }
 
 function resumeGame(reason) {
@@ -876,6 +888,9 @@ function resumeGame(reason) {
   startTime += pausedFor;
   if (slowdownEndsAt !== null) slowdownEndsAt += pausedFor;
   pausedAt = null;
+  if (positiveDueAt !== null) {
+    schedulePositiveSpawn(Math.max(0, positiveDueAt + pausedFor - performance.now()));
+  }
   restartLoop();
 }
 
@@ -904,7 +919,22 @@ const DIRECTION_KEYS = {
 };
 
 function handleKey(e) {
+  // Leave browser/OS shortcuts alone (Cmd+P to print, Ctrl+S to save, ...)
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   const key = e.key.toLowerCase();
+  // Holding a direction key is harmless (repeats of the same turn are
+  // ignored), but a held Enter/Space/P/Esc would fire again and again — e.g.
+  // closing the help popup and then immediately starting a round, or
+  // flickering pause on and off.
+  if (e.repeat && !Object.prototype.hasOwnProperty.call(DIRECTION_KEYS, key)) {
+    e.preventDefault();
+    return;
+  }
+  // A visible button or link that has keyboard focus (reached with Tab)
+  // should do its own thing on Enter/Space, not whatever the game would do.
+  // Mouse clicks blur their buttons, so this only ever applies to keyboard users.
+  const focused = e.target.closest?.("button, a");
+  if (focused && focused.getClientRects().length && (key === "enter" || key === " ")) return;
   // True for any key this game ever acts on — used below to block the
   // browser's default scroll/find behavior even in states where we don't
   // actually act on the key (e.g. arrow keys while an overlay is up). This
@@ -1008,7 +1038,10 @@ canvas.addEventListener("touchend", (e) => {
   if (Math.abs(dx) > Math.abs(dy)) steer({ x: Math.sign(dx), y: 0 });
   else steer({ x: 0, y: Math.sign(dy) });
 });
-startBtn.addEventListener("click", startGame);
+startBtn.addEventListener("click", () => {
+  startBtn.blur();
+  startGame();
+});
 // gameOverCloseBtn's click is handled by the delegated document click
 // listener above (dismissGameOver), same as the info modal's close button.
 
