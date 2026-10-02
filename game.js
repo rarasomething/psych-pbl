@@ -109,7 +109,7 @@ const COPING = [
     label: "Reframing the Thought",
     color: "#a3e635",
     effect: "clearNegatives",
-    clearFraction: 0.3, // share of the distortions on the board, rounded up
+    clearFraction: 0.5, // share of the distortions on the board, rounded up
     description: "Finding a more balanced way to look at a situation.",
   },
   {
