@@ -444,6 +444,18 @@ kbd {
   line-height: 1.55;
 }
 
+.info-example {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.info-example.hidden {
+  display: none;
+}
+
 .info-effect {
   margin: 12px 0 0;
   padding-top: 12px;

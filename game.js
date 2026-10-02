@@ -44,6 +44,7 @@ const DISTORTIONS = [
     color: "#ff6b6b",
     effect: "grow",
     description: "Deciding something bad is true without enough evidence.",
+    example: "My friend didn't text back, so they must be mad at me.",
   },
   {
     id: "allOrNothing",
@@ -52,6 +53,7 @@ const DISTORTIONS = [
     color: "#e64545",
     effect: "grow",
     description: "Seeing things as either perfect or a total failure.",
+    example: "I got a B on the test, so I'm a failure.",
   },
   {
     id: "blowingUp",
@@ -60,6 +62,7 @@ const DISTORTIONS = [
     color: "#cc3333",
     effect: "grow",
     description: "Treating a small problem like a huge disaster.",
+    example: "I tripped in the hallway. Everyone will remember it forever.",
   },
   {
     id: "overgeneralizing",
@@ -68,6 +71,7 @@ const DISTORTIONS = [
     color: "#b3232f",
     effect: "grow",
     description: "Taking one bad event and deciding it will always happen.",
+    example: "I didn't make the team. I never get picked for anything.",
   },
   {
     id: "personalizing",
@@ -76,6 +80,7 @@ const DISTORTIONS = [
     color: "#99182b",
     effect: "grow",
     description: "Believing something bad happened because of you.",
+    example: "My parents are arguing. It must be my fault.",
   },
   {
     id: "tunnelVision",
@@ -84,6 +89,7 @@ const DISTORTIONS = [
     color: "#7a1220",
     effect: "grow",
     description: "Focusing on one negative detail and ignoring everything else.",
+    example: "My post got 20 nice comments, but I keep thinking about the one mean one.",
   },
 ];
 
@@ -141,6 +147,7 @@ const startBtn = document.getElementById("start-btn");
 const infoModalEl = document.getElementById("info-modal");
 const infoTitleEl = document.getElementById("info-title");
 const infoDescEl = document.getElementById("info-desc");
+const infoExampleEl = document.getElementById("info-example");
 const infoEffectEl = document.getElementById("info-effect");
 const infoCloseBtn = document.getElementById("info-close");
 const muteBtn = document.getElementById("mute-btn");
@@ -271,6 +278,8 @@ function effectSummary(type) {
 function showInfoModal(type) {
   infoTitleEl.textContent = type.label;
   infoDescEl.textContent = type.description;
+  infoExampleEl.textContent = type.example ? `Example: "${type.example}"` : "";
+  infoExampleEl.classList.toggle("hidden", !type.example);
   infoEffectEl.textContent = effectSummary(type);
   infoModalEl.classList.remove("hidden");
   pauseGame("info"); // reading a definition shouldn't cost the player the round
