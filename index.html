@@ -77,6 +77,38 @@
         <button id="info-close" class="icon-btn" type="button" aria-label="Close">✕</button>
         <h2 id="info-title"></h2>
         <p id="info-desc"></p>
+        <!-- Beck's model as a flow diagram, only shown in the "Beck's cognitive model" popup -->
+        <div id="info-diagram" class="beck-diagram-wrap hidden">
+        <svg class="beck-diagram" viewBox="0 0 400 426" role="img" aria-labelledby="beck-diagram-title">
+          <title id="beck-diagram-title">Negative life experiences feed a negative schema and errors in logic. These feed each other and automatic thoughts, which shape the cognitive triad, which leads to depressive symptoms.</title>
+          <defs>
+            <marker id="beck-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M1 1 L9 5 L1 9" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+          <g class="beck-arrows">
+          <line x1="155" y1="64" x2="100" y2="97" marker-end="url(#beck-arrow)"/>
+          <line x1="245" y1="64" x2="300" y2="97" marker-end="url(#beck-arrow)"/>
+          <line x1="137" y1="127" x2="263" y2="127" marker-start="url(#beck-arrow)" marker-end="url(#beck-arrow)"/>
+          <line x1="112" y1="158" x2="150" y2="181" marker-start="url(#beck-arrow)" marker-end="url(#beck-arrow)"/>
+          <line x1="288" y1="158" x2="250" y2="181" marker-start="url(#beck-arrow)" marker-end="url(#beck-arrow)"/>
+          <line x1="62" y1="158" x2="138" y2="271" marker-start="url(#beck-arrow)" marker-end="url(#beck-arrow)"/>
+          <line x1="338" y1="158" x2="262" y2="271" marker-start="url(#beck-arrow)" marker-end="url(#beck-arrow)"/>
+          <line x1="200" y1="242" x2="200" y2="271" marker-start="url(#beck-arrow)" marker-end="url(#beck-arrow)"/>
+          <line x1="200" y1="332" x2="200" y2="361" marker-start="url(#beck-arrow)" marker-end="url(#beck-arrow)"/>
+          </g>
+          <g class="beck-boxes">
+          <g class="beck-node" style="--c: #ff8fa3" tabindex="0" role="button" data-term="Negative life experiences" data-def="Hard things that happen, like loss, rejection, or failure."><rect x="115" y="8" width="170" height="54" rx="12"/><text x="200" y="26">Negative life</text><text x="200" y="44">experiences</text></g>
+          <g class="beck-node" style="--c: #7cc4ff" tabindex="0" role="button" data-term="Negative schema" data-def="Deep beliefs about yourself, like “I'm not good enough.”"><rect x="8" y="100" width="124" height="54" rx="12"/><text x="70" y="118">Negative</text><text x="70" y="136">schema</text></g>
+          <g class="beck-node" style="--c: #a3e635" tabindex="0" role="button" data-term="Errors in logic" data-def="Thinking mistakes that twist the facts, like the distortions in this game."><rect x="268" y="100" width="124" height="54" rx="12"/><text x="330" y="118">Errors in</text><text x="330" y="136">logic</text></g>
+          <g class="beck-node" style="--c: #ffd166" tabindex="0" role="button" data-term="Automatic thoughts" data-def="Quick negative thoughts that pop into your head on their own."><rect x="132" y="184" width="136" height="54" rx="12"/><text x="200" y="202">Automatic</text><text x="200" y="220">thoughts</text></g>
+          <g class="beck-node" style="--c: #b9a8ff" tabindex="0" role="button" data-term="The cognitive triad" data-def="Seeing yourself, the world, and your future in a negative way."><rect x="110" y="274" width="180" height="54" rx="12"/><text x="200" y="292">The cognitive</text><text x="200" y="310">triad</text></g>
+          <g class="beck-node" style="--c: #ffa94d" tabindex="0" role="button" data-term="Depressive symptoms" data-def="Signs of depression, like feeling sad, tired, or losing interest in things."><rect x="125" y="364" width="150" height="54" rx="12"/><text x="200" y="382">Depressive</text><text x="200" y="400">symptoms</text></g>
+          </g>
+        </svg>
+        <!-- Fixed height, so the definition changing never shifts the popup -->
+        <p id="beck-caption" class="beck-caption" aria-live="polite"></p>
+        </div>
         <p id="info-example" class="info-example hidden"></p>
         <p id="info-effect" class="info-effect"></p>
         <div id="info-studies" class="info-studies hidden"></div>

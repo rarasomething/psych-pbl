@@ -144,6 +144,7 @@ const TOPICS = {
     label: "Beck's cognitive model",
     description: "Beck's model says negative thinking habits, called cognitive distortions, can keep depression going. Coping skills help people notice these thoughts and respond in a more balanced way.",
     effect: "In this game, distortions are the red squares and coping skills are the glowing diamonds.",
+    diagram: true,
   },
   // Brief AMRC (aim, method, results, conclusion) for each study
   studies: {
@@ -193,6 +194,9 @@ const infoDescEl = document.getElementById("info-desc");
 const infoExampleEl = document.getElementById("info-example");
 const infoEffectEl = document.getElementById("info-effect");
 const infoStudiesEl = document.getElementById("info-studies");
+const infoDiagramEl = document.getElementById("info-diagram");
+const beckCaptionEl = document.getElementById("beck-caption");
+const BECK_CAPTION_HINT = "Tap or hover over a box to see what it means.";
 const infoCloseBtn = document.getElementById("info-close");
 const muteBtn = document.getElementById("mute-btn");
 const helpModalEl = document.getElementById("help-modal");
@@ -330,6 +334,10 @@ function showInfoModal(type) {
   infoEffectEl.textContent = effect;
   infoEffectEl.classList.toggle("hidden", !effect);
   renderStudies(type.studies ?? []);
+  infoDiagramEl.classList.toggle("hidden", !type.diagram);
+  if (type.diagram) showBeckTerm(null);
+  // the studies and the diagram need more room than a pellet definition
+  infoModalEl.querySelector(".info-card").classList.toggle("wide", Boolean(type.studies || type.diagram));
   infoModalEl.classList.remove("hidden");
   pauseGame("info"); // reading a definition shouldn't cost the player the round
 }
@@ -338,7 +346,6 @@ function showInfoModal(type) {
 function renderStudies(studies) {
   infoStudiesEl.innerHTML = "";
   infoStudiesEl.classList.toggle("hidden", !studies.length);
-  infoModalEl.querySelector(".info-card").classList.toggle("wide", studies.length > 0);
   for (const study of studies) {
     const card = document.createElement("section");
     card.className = "study";
@@ -355,6 +362,30 @@ function renderStudies(studies) {
     card.append(name, list);
     infoStudiesEl.appendChild(card);
   }
+}
+
+// Diagram boxes: hovering, tapping, or tabbing to one highlights it and shows
+// a short definition in the caption under the diagram.
+function showBeckTerm(node) {
+  infoDiagramEl.querySelectorAll(".beck-node.active").forEach((n) => n.classList.remove("active"));
+  beckCaptionEl.textContent = "";
+  if (!node) {
+    beckCaptionEl.classList.add("hint");
+    beckCaptionEl.textContent = BECK_CAPTION_HINT;
+    return;
+  }
+  node.classList.add("active");
+  beckCaptionEl.classList.remove("hint");
+  beckCaptionEl.style.setProperty("--c", node.style.getPropertyValue("--c"));
+  const term = document.createElement("strong");
+  term.textContent = node.dataset.term;
+  beckCaptionEl.append(term, document.createTextNode(`: ${node.dataset.def}`));
+}
+
+for (const node of infoDiagramEl.querySelectorAll(".beck-node")) {
+  node.addEventListener("pointerenter", () => showBeckTerm(node));
+  node.addEventListener("focus", () => showBeckTerm(node));
+  node.addEventListener("click", () => showBeckTerm(node));
 }
 
 function hideInfoModal() {

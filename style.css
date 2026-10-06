@@ -611,6 +611,91 @@ kbd {
   overflow-y: auto;
 }
 
+.beck-diagram-wrap.hidden {
+  display: none;
+}
+
+.beck-diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 16px 0 10px;
+}
+
+.beck-node {
+  cursor: pointer;
+  outline: none;
+}
+
+.beck-node rect {
+  transition: fill 0.15s ease, stroke-width 0.15s ease;
+}
+
+.beck-node:hover rect,
+.beck-node.active rect {
+  fill: color-mix(in srgb, var(--c) 38%, var(--panel));
+  stroke-width: 3;
+}
+
+.beck-node:focus-visible rect {
+  stroke: #fff;
+}
+
+/* Two lines tall at all times, so the popup doesn't jump as it changes */
+.beck-caption {
+  min-height: 3.2em;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--panel-2);
+  border-left: 4px solid var(--c, var(--border));
+  font-size: 0.85rem;
+  line-height: 1.45;
+  box-sizing: content-box;
+}
+
+.beck-caption strong {
+  font-family: var(--font-fun);
+  font-weight: 600;
+  color: var(--c);
+}
+
+@media (max-width: 420px) {
+  .beck-caption {
+    min-height: 4.35em; /* three lines on narrow phones */
+  }
+}
+
+.beck-caption.hint {
+  --c: var(--border);
+  color: var(--muted);
+  font-style: italic;
+}
+
+.beck-arrows line,
+.beck-diagram marker path {
+  stroke: var(--muted);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+/* Each box: a tint of its color, a solid outline and "ledge", like the chips */
+.beck-boxes rect {
+  fill: color-mix(in srgb, var(--c) 16%, var(--panel));
+  stroke: var(--c);
+  stroke-width: 2;
+  filter: drop-shadow(0 3px 0 color-mix(in srgb, var(--c) 45%, transparent));
+}
+
+.beck-boxes text {
+  fill: var(--text);
+  font-family: var(--font-fun);
+  font-size: 16px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
 .info-studies.hidden {
   display: none;
 }
