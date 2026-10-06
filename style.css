@@ -162,6 +162,7 @@ header h1 {
 
 .intro-chip[data-topic="mdd"] { --chip-color: var(--pink); }
 .intro-chip[data-topic="beck"] { --chip-color: var(--teal); }
+.intro-chip[data-topic="studies"] { --chip-color: var(--yellow); }
 
 .intro-chip::before {
   content: "i";
@@ -601,6 +602,59 @@ kbd {
   color: var(--muted);
   font-size: 0.78rem;
   line-height: 1.5;
+}
+
+/* The "Related studies" popup holds more text, so it's wider and scrolls. */
+.info-card.wide {
+  max-width: 460px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.info-studies.hidden {
+  display: none;
+}
+
+.study {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: var(--panel-2);
+  border-radius: var(--radius-md);
+}
+
+.overlay-card .study h3 {
+  margin: 0 0 8px;
+  color: var(--yellow);
+}
+
+.study dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.study dt {
+  font-family: var(--font-fun);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.study dd {
+  margin: 0;
+}
+
+@media (max-width: 420px) {
+  .study dl {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .study dd + dt {
+    margin-top: 6px;
+  }
 }
 
 .icon-btn {

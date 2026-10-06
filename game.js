@@ -145,6 +145,27 @@ const TOPICS = {
     description: "Beck's model says negative thinking habits, called cognitive distortions, can keep depression going. Coping skills help people notice these thoughts and respond in a more balanced way.",
     effect: "In this game, distortions are the red squares and coping skills are the glowing diamonds.",
   },
+  // Brief AMRC (aim, method, results, conclusion) for each study
+  studies: {
+    label: "Related studies",
+    description: "Two studies that put Beck's model to the test.",
+    studies: [
+      {
+        name: "Alloy et al. (1999)",
+        aim: "Does a habit of negative thinking make people more likely to become depressed?",
+        method: "Researchers gave thinking-style surveys to over 5,000 college freshmen. They followed the most negative thinkers (172) and the most positive thinkers (175) for 2.5 years. No one was depressed at the start.",
+        results: "Among students who had never been depressed before, 17% of the negative thinkers became depressed, compared with 1% of the positive thinkers.",
+        conclusion: "Negative thinking came first, so it can make depression more likely. It isn't the only cause, though: most negative thinkers never became depressed.",
+      },
+      {
+        name: "Joiner et al. (1999)",
+        aim: "Does negative thinking lead to depression after something bad happens?",
+        method: "119 college students took surveys about their thinking habits before a big exam. After getting their grades, they reported their thoughts and mood over the next few days.",
+        results: "Only negative thinkers who did badly on the exam felt more depressed. Their negative thoughts about themselves, the world, and the future explained the change.",
+        conclusion: "Negative thinking alone wasn't enough. It took a stressful event to set it off, just as Beck's model predicts. The study only looked at short-term mood in college students, not clinical depression.",
+      },
+    ],
+  },
 };
 
 const canvas = document.getElementById("board");
@@ -171,6 +192,7 @@ const infoTitleEl = document.getElementById("info-title");
 const infoDescEl = document.getElementById("info-desc");
 const infoExampleEl = document.getElementById("info-example");
 const infoEffectEl = document.getElementById("info-effect");
+const infoStudiesEl = document.getElementById("info-studies");
 const infoCloseBtn = document.getElementById("info-close");
 const muteBtn = document.getElementById("mute-btn");
 const helpModalEl = document.getElementById("help-modal");
@@ -307,8 +329,32 @@ function showInfoModal(type) {
   const effect = type.kind ? effectSummary(type) : type.effect ?? "";
   infoEffectEl.textContent = effect;
   infoEffectEl.classList.toggle("hidden", !effect);
+  renderStudies(type.studies ?? []);
   infoModalEl.classList.remove("hidden");
   pauseGame("info"); // reading a definition shouldn't cost the player the round
+}
+
+// Each study as a small card: its name, then labeled aim/method/results/conclusion.
+function renderStudies(studies) {
+  infoStudiesEl.innerHTML = "";
+  infoStudiesEl.classList.toggle("hidden", !studies.length);
+  infoModalEl.querySelector(".info-card").classList.toggle("wide", studies.length > 0);
+  for (const study of studies) {
+    const card = document.createElement("section");
+    card.className = "study";
+    const name = document.createElement("h3");
+    name.textContent = study.name;
+    const list = document.createElement("dl");
+    for (const [key, label] of [["aim", "Aim"], ["method", "Method"], ["results", "Results"], ["conclusion", "Conclusion"]]) {
+      const dt = document.createElement("dt");
+      dt.textContent = label;
+      const dd = document.createElement("dd");
+      dd.textContent = study[key];
+      list.append(dt, dd);
+    }
+    card.append(name, list);
+    infoStudiesEl.appendChild(card);
+  }
 }
 
 function hideInfoModal() {
