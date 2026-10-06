@@ -149,6 +149,13 @@ const TOPICS = {
 
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
+// Draw at the screen's pixel density so the faces and sparkles stay crisp on
+// phones and retina screens; all drawing code works in 300×300 board units.
+const BOARD_PX = GRID_SIZE * CELL_PX;
+const PIXEL_RATIO = Math.min(window.devicePixelRatio || 1, 3);
+canvas.width = canvas.height = BOARD_PX * PIXEL_RATIO;
+canvas.style.width = `${BOARD_PX}px`;
+ctx.scale(PIXEL_RATIO, PIXEL_RATIO);
 const tallyListEl = document.getElementById("tally-list");
 const copingListEl = document.getElementById("coping-list");
 const scoreEl = document.getElementById("score");
@@ -176,6 +183,7 @@ const takeawayEl = document.getElementById("takeaway");
 const newBestEl = document.getElementById("new-best");
 const playAgainBtn = document.getElementById("play-again-btn");
 const dpadEl = document.getElementById("dpad");
+const boardCardEl = document.querySelector(".board-card");
 
 // ---- Sound effects ----------------------------------------------------
 // Synthesized with the Web Audio API rather than audio files, so the game
@@ -396,6 +404,7 @@ let pausedAt = null; // performance.now() when the round was paused, else null
 // player had paused themselves.
 const pauseReasons = new Set();
 let floatingTexts = []; // short-lived labels/rings drawn over the board (see addFloatingText)
+let particles = []; // little bursts when a pellet is eaten (see addBurst)
 let bestScore = 0;
 try {
   bestScore = Number(localStorage.getItem(BEST_SCORE_KEY)) || 0;
@@ -486,6 +495,7 @@ function resetState() {
   speedMultiplier = 1;
   slowdownEndsAt = null;
   floatingTexts = [];
+  particles = [];
   running = true;
   // The round is "on" (running=true) as soon as Start is pressed, but
   // everything that actually progresses time — the tick loop, ambient
@@ -522,13 +532,16 @@ function beginMoving() {
   restartLoop();
 }
 
-function renderTally(el, types) {
+// bumpId (optional) briefly pops that row's count, so the sidebar reacts
+// when a pellet is eaten.
+function renderTally(el, types, bumpId) {
   el.innerHTML = "";
   for (const d of types) {
     const li = document.createElement("li");
+    if (d.id === bumpId) li.classList.add("bump");
 
     const swatch = document.createElement("span");
-    swatch.className = "swatch";
+    swatch.className = `swatch swatch-${d.kind}`;
     swatch.style.background = d.color;
     swatch.style.color = d.color;
 
@@ -589,9 +602,10 @@ function tick() {
     const type = negativeFoods[negIndex].type;
     negativeFoods.splice(negIndex, 1);
     tally[type.id]++;
-    renderTally(tallyListEl, DISTORTIONS);
+    renderTally(tallyListEl, DISTORTIONS, type.id);
     playEatDistortion();
     addFloatingText("+1", head, "#ff8a8a");
+    addBurst(head, type.color, 6);
 
     // unshift already added the head; skip the pop so the snake grows by 1
     speedMs = Math.max(MIN_SPEED_MS, speedMs - SPEED_STEP_MS);
@@ -605,8 +619,9 @@ function tick() {
     const type = positiveFood.type;
     positiveFood = null;
     tally[type.id]++;
-    renderTally(copingListEl, COPING);
+    renderTally(copingListEl, COPING, type.id);
     playEatCoping();
+    addBurst(head, type.color, 14);
 
     // undo the unshift's growth — this happens for every coping type,
     // regardless of its specific effect below
@@ -707,22 +722,16 @@ const TRAIL_COLOR_RAMP = Array.from({ length: TRAIL_DARKEN_SPAN + 1 }, (_, i) =>
   mixColor(TRAIL_HEAD_COLOR, TRAIL_TAIL_COLOR, i / TRAIL_DARKEN_SPAN)
 );
 
-function draw(timeMs) {
-  ctx.fillStyle = "#14141f";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+const BOARD_DARK = "#15152a";
+const BOARD_LIGHT = "#1a1a33";
 
-  // faint grid
-  ctx.strokeStyle = "rgba(255,255,255,0.03)";
-  ctx.lineWidth = 1;
-  for (let i = 1; i < GRID_SIZE; i++) {
-    ctx.beginPath();
-    ctx.moveTo(i * CELL_PX, 0);
-    ctx.lineTo(i * CELL_PX, canvas.height);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, i * CELL_PX);
-    ctx.lineTo(canvas.width, i * CELL_PX);
-    ctx.stroke();
+function draw(timeMs) {
+  // checkerboard, like a game board
+  for (let x = 0; x < GRID_SIZE; x++) {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      ctx.fillStyle = (x + y) % 2 ? BOARD_LIGHT : BOARD_DARK;
+      ctx.fillRect(x * CELL_PX, y * CELL_PX, CELL_PX, CELL_PX);
+    }
   }
 
   // glow behind each food — coping pellets pulse to draw the eye; distortions
@@ -735,26 +744,15 @@ function draw(timeMs) {
     const fy = item.y * CELL_PX + CELL_PX / 2;
     const glowR = CELL_PX * (isCoping ? 1.3 + pulse * 0.35 : 1);
     const glow = ctx.createRadialGradient(fx, fy, 0, fx, fy, glowR);
-    glow.addColorStop(0, item.type.color + (isCoping ? "cc" : "88"));
+    glow.addColorStop(0, item.type.color + (isCoping ? "cc" : "66"));
     glow.addColorStop(1, item.type.color + "00");
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(fx, fy, glowR, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = item.type.color;
-    if (isCoping) {
-      // bright rotated diamond, visually distinct from the dull distortion pellets
-      const size = CELL_PX - 8;
-      ctx.save();
-      ctx.translate(fx, fy);
-      ctx.rotate(Math.PI / 4);
-      ctx.fillRect(-size / 2, -size / 2, size, size);
-      ctx.restore();
-    } else {
-      roundRect(item.x * CELL_PX + 3, item.y * CELL_PX + 3, CELL_PX - 6, CELL_PX - 6, 4);
-      ctx.fill();
-    }
+    if (isCoping) drawCopingPellet(item, fx, fy, timeMs);
+    else drawDistortionPellet(item, fx, fy);
   }
 
   // snake, tail-first so the head renders on top; body darkens the further
@@ -768,34 +766,137 @@ function draw(timeMs) {
       const depth = Math.min(TRAIL_DARKEN_SPAN, i - 1);
       ctx.fillStyle = TRAIL_COLOR_RAMP[depth];
     }
-    roundRect(seg.x * CELL_PX + 1, seg.y * CELL_PX + 1, CELL_PX - 2, CELL_PX - 2, 5);
+    // round, blobby segments; the head is a little bigger
+    const inset = isHead ? 1 : 2;
+    roundRect(seg.x * CELL_PX + inset, seg.y * CELL_PX + inset, CELL_PX - inset * 2, CELL_PX - inset * 2, isHead ? 11 : 9);
     ctx.fill();
     // Outline on every segment so the tail can never fully blend into the
     // background, whatever the fill color ends up being — belt-and-braces on
-    // top of the TRAIL_TAIL_COLOR change above (was 0.12 alpha, too faint to
-    // actually read as an edge once the fill itself got close to the
-    // background — raised so it gives real definition, not just a hint).
+    // top of the TRAIL_TAIL_COLOR change above.
     ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
     ctx.lineWidth = 1;
     ctx.stroke();
   }
 
-  // eyes on the head, oriented with travel direction
+  drawSnakeFace(timeMs);
+  drawParticles(timeMs);
+  drawFloatingTexts(timeMs);
+}
+
+// Distortions are little grumpy squares: two dot eyes under slanted brows.
+function drawDistortionPellet(item, fx, fy) {
+  ctx.fillStyle = item.type.color;
+  roundRect(item.x * CELL_PX + 4, item.y * CELL_PX + 4, CELL_PX - 8, CELL_PX - 8, 6);
+  ctx.fill();
+  ctx.fillStyle = "rgba(20, 10, 16, 0.85)";
+  ctx.strokeStyle = "rgba(20, 10, 16, 0.85)";
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = "round";
+  [-1, 1].forEach((s) => {
+    ctx.beginPath();
+    ctx.arc(fx + s * 4, fy + 1, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(fx + s * 6.5, fy - 4.5);
+    ctx.lineTo(fx + s * 2, fy - 2.5);
+    ctx.stroke();
+  });
+}
+
+// Coping skills are bright diamonds with a twinkling highlight.
+function drawCopingPellet(item, fx, fy, timeMs) {
+  const size = CELL_PX - 10;
+  const bob = Math.sin(timeMs / 300) * 1.5;
+  ctx.save();
+  ctx.translate(fx, fy + bob);
+  ctx.rotate(Math.PI / 4);
+  ctx.fillStyle = item.type.color;
+  roundRect(-size / 2, -size / 2, size, size, 3);
+  ctx.fill();
+  ctx.restore();
+  const twinkle = 0.5 + 0.5 * Math.sin(timeMs / 180);
+  ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + twinkle * 0.5})`;
+  drawSparkle(fx - 3, fy - 3 + bob, 2 + twinkle * 2);
+}
+
+function drawSparkle(x, y, r) {
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.quadraticCurveTo(x, y, x, y + r);
+  ctx.quadraticCurveTo(x, y, x - r, y);
+  ctx.quadraticCurveTo(x, y, x, y - r);
+  ctx.fill();
+}
+
+// Big googly eyes that look where the snake is heading, plus a blink every
+// few seconds.
+function drawSnakeFace(timeMs) {
   const head = snake[0];
   const cx = head.x * CELL_PX + CELL_PX / 2;
   const cy = head.y * CELL_PX + CELL_PX / 2;
-  const offX = direction.x * 4;
-  const offY = direction.y * 4;
-  const perpX = direction.y * 3;
-  const perpY = -direction.x * 3;
-  ctx.fillStyle = "#14141f";
+  const offX = direction.x * 3;
+  const offY = direction.y * 3;
+  const perpX = direction.y * 5;
+  const perpY = -direction.x * 5;
+  const blinking = timeMs % 3800 < 130;
   [-1, 1].forEach((s) => {
+    const ex = cx + offX + perpX * s;
+    const ey = cy + offY + perpY * s;
+    if (blinking) {
+      ctx.strokeStyle = "#14141f";
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(ex - 3, ey);
+      ctx.lineTo(ex + 3, ey);
+      ctx.stroke();
+      return;
+    }
+    ctx.fillStyle = "#ffffff";
     ctx.beginPath();
-    ctx.arc(cx + offX + perpX * s, cy + offY + perpY * s, 1.6, 0, Math.PI * 2);
+    ctx.arc(ex, ey, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(20, 20, 31, 0.35)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = "#14141f";
+    ctx.beginPath();
+    ctx.arc(ex + direction.x * 1.5, ey + direction.y * 1.5, 2.1, 0, Math.PI * 2);
     ctx.fill();
   });
+}
 
-  drawFloatingTexts(timeMs);
+// A little puff of dots flying out from where a pellet was eaten.
+function addBurst(cell, color, count) {
+  const born = performance.now();
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+    const speed = 30 + Math.random() * 40; // px per second
+    particles.push({
+      x: cell.x * CELL_PX + CELL_PX / 2,
+      y: cell.y * CELL_PX + CELL_PX / 2,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      color,
+      born,
+    });
+  }
+}
+
+const PARTICLE_MS = 600;
+
+function drawParticles(timeMs) {
+  particles = particles.filter((p) => timeMs - p.born < PARTICLE_MS);
+  for (const p of particles) {
+    const t = Math.max(0, (timeMs - p.born) / PARTICLE_MS);
+    const secs = t * (PARTICLE_MS / 1000);
+    ctx.globalAlpha = 1 - t;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x + p.vx * secs, p.y + p.vy * secs, 2.5 * (1 - t * 0.5), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
 
 function addFloatingText(text, cell, color) {
@@ -822,15 +923,15 @@ function drawFloatingTexts(timeMs) {
       ctx.arc(cx, cy, CELL_PX * (0.3 + t * 0.6), 0, Math.PI * 2);
       ctx.stroke();
     } else {
-      ctx.font = "600 13px Inter, system-ui, sans-serif";
+      ctx.font = "600 14px Fredoka, Inter, system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       const width = ctx.measureText(f.text).width;
       // keep the label fully on the board even when eaten next to an edge
-      const x = Math.min(Math.max(cx, width / 2 + 4), canvas.width - width / 2 - 4);
+      const x = Math.min(Math.max(cx, width / 2 + 4), BOARD_PX - width / 2 - 4);
       const y = Math.max(cy - 14 - t * 24, 10);
       ctx.lineWidth = 3;
-      ctx.strokeStyle = "#14141f";
+      ctx.strokeStyle = BOARD_DARK;
       ctx.strokeText(f.text, x, y);
       ctx.fillStyle = f.color;
       ctx.fillText(f.text, x, y);
@@ -863,6 +964,10 @@ function gameOver() {
   clearTimeout(ambientSpawnTimeout);
   slowdownEndsAt = null;
   playGameOver();
+  // quick shake of the board (skipped for reduced motion, see style.css)
+  boardCardEl.classList.remove("shake");
+  void boardCardEl.offsetWidth; // restart the animation if it's already applied
+  boardCardEl.classList.add("shake");
   renderTally(finalTallyEl, DISTORTIONS);
   renderTally(finalCopingEl, COPING);
   const secondsSurvived = Math.floor((performance.now() - startTime) / 1000);
