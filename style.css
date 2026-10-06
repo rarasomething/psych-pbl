@@ -130,27 +130,7 @@ header h1 {
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0.005em;
-}
-
-.title-text {
-  background: linear-gradient(90deg, var(--teal), var(--accent) 50%, var(--pink));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.title-snake {
-  display: inline-block;
-  margin-right: 4px;
-  transform-origin: 50% 80%;
-  animation: wiggle 2.6s ease-in-out infinite;
-}
-
-@keyframes wiggle {
-  0%, 70%, 100% { transform: rotate(0); }
-  76% { transform: rotate(-14deg); }
-  84% { transform: rotate(12deg); }
-  92% { transform: rotate(-6deg); }
+  color: #fff;
 }
 
 /* A row of small chips under the title; each opens its topic in the info
