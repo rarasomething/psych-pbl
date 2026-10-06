@@ -132,6 +132,21 @@ const COPING = [
 
 const ALL_TYPES = [...DISTORTIONS, ...COPING];
 
+// Background topics behind the "What is MDD?" / "Beck's cognitive model"
+// chips under the title. They open in the same popup as the pellet "?"
+// buttons, so the page stays short until someone wants to read more.
+const TOPICS = {
+  mdd: {
+    label: "What is MDD?",
+    description: "Major depressive disorder (MDD) is a common mental health condition. People with MDD feel sad or empty, or lose interest in things they used to enjoy, for at least two weeks.",
+  },
+  beck: {
+    label: "Beck's cognitive model",
+    description: "Beck's model says negative thinking habits, called cognitive distortions, can keep depression going. Coping skills help people notice these thoughts and respond in a more balanced way.",
+    effect: "In this game, distortions are the red squares and coping skills are the glowing diamonds.",
+  },
+};
+
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
 const tallyListEl = document.getElementById("tally-list");
@@ -280,7 +295,10 @@ function showInfoModal(type) {
   infoDescEl.textContent = type.description;
   infoExampleEl.textContent = type.example ? `Example: "${type.example}"` : "";
   infoExampleEl.classList.toggle("hidden", !type.example);
-  infoEffectEl.textContent = effectSummary(type);
+  // topics carry their own (optional) closing line instead of a pellet effect
+  const effect = type.kind ? effectSummary(type) : type.effect ?? "";
+  infoEffectEl.textContent = effect;
+  infoEffectEl.classList.toggle("hidden", !effect);
   infoModalEl.classList.remove("hidden");
   pauseGame("info"); // reading a definition shouldn't cost the player the round
 }
@@ -325,6 +343,13 @@ document.addEventListener("click", (e) => {
     infoBtn.blur();
     const type = findType(infoBtn.dataset.id);
     if (type) showInfoModal(type);
+    return;
+  }
+  const chip = e.target.closest(".intro-chip");
+  if (chip) {
+    chip.blur(); // same reason as the info buttons
+    const topic = TOPICS[chip.dataset.topic];
+    if (topic) showInfoModal(topic);
     return;
   }
   if (e.target === helpModalEl || e.target.closest("#help-close, #help-ok")) {

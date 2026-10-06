@@ -86,35 +86,50 @@ header h1 {
   letter-spacing: -0.02em;
 }
 
-/* Spans exactly the board card + gap + sidebar (330 + 20 + 280) on desktop;
-   on narrow screens it matches the stacked boxes (see the media query below). */
+/* A row of small chips under the title; each opens its topic in the info
+   popup, so the background text stays out of the way until it's wanted. */
 .intro {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  max-width: 630px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
   margin: 0 auto 20px;
-  padding: 14px 18px;
+}
+
+.intro-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-}
-
-.intro h2 {
-  margin: 0 0 4px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.intro p {
-  margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.5;
+  border-radius: 999px;
   color: var(--text);
-  opacity: 0.85;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.intro-chip::before {
+  content: "i";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-style: italic;
+}
+
+.intro-chip:hover {
+  background: var(--panel-2);
+  border-color: var(--accent);
 }
 
 .game-area {
@@ -456,6 +471,10 @@ kbd {
   display: none;
 }
 
+.info-effect.hidden {
+  display: none;
+}
+
 .info-effect {
   margin: 12px 0 0;
   padding-top: 12px;
@@ -515,14 +534,60 @@ kbd {
 }
 
 .help-list {
-  margin: 0 0 18px;
-  padding-left: 18px;
-  font-size: 0.86rem;
-  line-height: 1.55;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.help-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .help-list li + li {
-  margin-top: 8px;
+  margin-top: 10px;
+}
+
+/* Small visual cue per rule: a key, a red square, a teal diamond, a wall hit. */
+.help-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.help-icon-bad::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #e64545;
+}
+
+.help-icon-good::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background: #5eead4;
+  transform: rotate(45deg);
+  box-shadow: 0 0 8px rgba(94, 234, 212, 0.7);
+}
+
+.help-tip {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .help-link {
@@ -650,15 +715,9 @@ kbd {
   transform: translateY(0);
 }
 
-/* Once the sidebar wraps under the board, give the intro, board and sidebar
-   one shared width so they still line up. */
+/* Once the sidebar wraps under the board, give the board and sidebar one
+   shared width so they still line up. */
 @media (max-width: 601px) {
-  .intro {
-    grid-template-columns: 1fr;
-    gap: 10px;
-    max-width: 330px;
-  }
-
   .sidebar {
     flex-basis: 100%;
     max-width: 330px;

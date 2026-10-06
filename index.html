@@ -15,17 +15,12 @@
       <h1>Don't Feed the Snake!</h1>
     </header>
 
-    <!-- Same width as the board + sidebar below it, so the three boxes line up. -->
-    <section class="intro">
-      <div class="intro-part">
-        <h2>What is MDD?</h2>
-        <p>Major depressive disorder (MDD) is a common mental health condition. People with MDD feel sad or empty, or lose interest in things they used to enjoy, for at least two weeks.</p>
-      </div>
-      <div class="intro-part">
-        <h2>Beck's cognitive model</h2>
-        <p>Beck's model says negative thinking habits, called cognitive distortions, can keep depression going. Coping skills help people notice these thoughts and respond in a more balanced way.</p>
-      </div>
-    </section>
+    <!-- Short background on the topic, hidden until clicked: each chip opens
+         the same popup as the pellet "?" buttons (and pauses a round). -->
+    <nav class="intro" aria-label="Background">
+      <button type="button" class="intro-chip" data-topic="mdd">What is MDD?</button>
+      <button type="button" class="intro-chip" data-topic="beck">Beck's cognitive model</button>
+    </nav>
 
     <div class="game-area">
       <div class="board-card">
@@ -38,7 +33,7 @@
           <div id="start-overlay" class="board-overlay">
             <div class="board-overlay-content">
               <h2>Ready?</h2>
-              <p>Steer with the arrow keys or WASD, or swipe on a touch screen. Tap the <span class="info-btn-demo">?</span> next to any pellet in the key for what it means.</p>
+              <p>Press Start, then move to begin.</p>
               <button id="start-btn">Start</button>
             </div>
           </div>
@@ -91,16 +86,15 @@
       <div class="overlay-card help-card">
         <button id="help-close" class="icon-btn" type="button" aria-label="Close">✕</button>
         <h2>How to play</h2>
-        <p>Your snake is a mind under pressure. Survive as long as you can while negative thoughts pile up.</p>
+        <p>Survive as long as you can while negative thoughts pile up.</p>
         <ul class="help-list">
-          <li><strong>Move</strong> with the arrow keys or <kbd>WASD</kbd>. On a phone or tablet, swipe on the board or use the arrow pad. The snake waits for your first move before it starts.</li>
-          <li><strong>Red squares are cognitive distortions.</strong> Eating one grows your trail and speeds the game up. New ones keep appearing whether you eat them or not.</li>
-          <li><strong>Bright diamonds are coping skills.</strong> They're rarer, and each pushes back differently: <em>Checking the Evidence</em> shrinks your trail, <em>Reframing the Thought</em> clears distortions off the board, and <em>Taking a Small Step</em> slows the pace for a few seconds.</li>
-          <li><strong>Don't hit the walls or your own trail.</strong> Your score is how many seconds you survive.</li>
-          <li>Click the <span class="info-btn-demo">?</span> next to anything in the key to see what it means. The game pauses while you read.</li>
-          <li>Press <kbd>P</kbd> or <kbd>Esc</kbd> to pause.</li>
+          <li><span class="help-icon help-icon-move">↑</span><span><strong>Move</strong> with the arrow keys or <kbd>WASD</kbd>, or swipe. <kbd>P</kbd> pauses.</span></li>
+          <li><span class="help-icon help-icon-bad"></span><span><strong>Red squares</strong> are distortions. They make you longer and faster.</span></li>
+          <li><span class="help-icon help-icon-good"></span><span><strong>Glowing diamonds</strong> are coping skills. Grab them to push back.</span></li>
+          <li><span class="help-icon help-icon-wall">✕</span><span><strong>Don't hit</strong> the walls or yourself. Score = seconds survived.</span></li>
         </ul>
-        <a class="help-link" href="https://docs.google.com/document/d/1l2hOG1bGz_QhXd4m-UreMS6_uuhsR1wX6SsWjypVELQ/edit?usp=sharing" target="_blank" rel="noopener">What is Major Depressive Disorder, and what are its cognitive causes? Read more →</a>
+        <p class="help-tip">Tap <span class="info-btn-demo">?</span> next to any pellet in the key to learn what it means.</p>
+        <a class="help-link" href="https://docs.google.com/document/d/1l2hOG1bGz_QhXd4m-UreMS6_uuhsR1wX6SsWjypVELQ/edit?usp=sharing" target="_blank" rel="noopener">Learn more about depression and its causes →</a>
         <button id="help-ok" class="primary-btn" type="button">Got it</button>
       </div>
     </div>
